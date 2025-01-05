@@ -40,6 +40,9 @@ Memory::Memory(int cacheSize, int BlockSize, int ways){
 	this->tagDirectory = std::vector<std::vector<int>>(this->ways,
 							   std::vector<int>(pow(2,this->cacheSize), -1)); // init a matrix of -1
 
+	for (int i=0; i < pow(2,this->setSize); i++) {
+		this->_LRU.emplace_back(this->ways); // Construct each LRU with its capacity
+	}
 	// this->cache = new int[pow(2, this->setSize)];  // Dynamically allocate the array
 
 
