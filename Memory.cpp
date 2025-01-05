@@ -3,7 +3,6 @@
 //
 
 #include "Memory.h"
-
 #include <algorithm>
 #include <cmath>
 #include <sstream>
@@ -32,7 +31,7 @@ void LRU::remove_specific(int target) {
 	usageOrder.erase(values[target]);  // Remove the old position
 }
 
-Memory::Memory(int cacheSize, int BlockSize, int ways){
+Memory::Memory(unsigned int cacheSize, unsigned int BlockSize, unsigned int ways){
 	this->cacheSize = cacheSize; //pow(2,cacheSize);
 	this->blockSize = BlockSize; //pow(2, BlockSize);
 	this ->setSize = cacheSize - BlockSize - ways;
@@ -107,7 +106,6 @@ bool Memory::load_data(int tag, int set) {
 		ran_LRU = true;
 	}
 	return ran_LRU; // notify that LRU was removed
-
 }
 
 void Memory::invalidate_data(int tag, int set) {
@@ -121,38 +119,82 @@ void Memory::invalidate_data(int tag, int set) {
 	}
 }
 
-
-
-Memory_Manager::Memory_Manager(int l1_cache_size, int l1_block_size, int l1_way,
-						 int l2_cache_size, int l2_block_size, int l2_way, int l1_time,
-						 int l2_time, int memory_time, int writing_policy)
+MemoryManager::MemoryManager(unsigned int l1_cache_size,
+	unsigned int l2_cache_size, unsigned int l1_block_size, unsigned int l2_block_size,
+		unsigned int l1_way, unsigned int l2_way, unsigned int l1_time, unsigned int l2_time,
+		unsigned int memory_time, bool write_allocate)
 	: l1_cache(l1_cache_size, l1_block_size, l1_way),  // Initialize l1_cache in the initializer list
 	  l2_cache(l2_cache_size, l2_block_size, l2_way)   // Initialize l2_cache in the initializer list
 {
 	this->l1_time = l1_time;
 	this->l2_time = l2_time;
 	this->memory_time = memory_time;
-	this->writing_policy = writing_policy;
+	this->write_allocate = write_allocate;
+	this->numL1Miss = 0;
+	this->numL2Miss = 0;
+	this->numOperations = 0;
+	this->totalAccessTime = 0;
 }
 
-void Memory_Manager::find(const std::string &addressStr) {
+void MemoryManager::find(const std::string &addressStr) {
+	this->incrementNumOperations();
 	int set1 = this->l1_cache.extractSet(addressStr);
 	int set2 = this->l2_cache.extractSet(addressStr);
 	int tag1 = this->l1_cache.extractTag(addressStr);
 	int tag2 = this->l2_cache.extractTag(addressStr);
 
 	bool l1_found = this->l1_cache.find(tag1, set1);
+	this->updateAccessTime(this->l1_time);
 	bool l2_found = false;
 	if (!l1_found) {
+		this->incrementL1Miss();
 		l2_found = this->l2_cache.find(tag2, set2);
+		this->updateAccessTime(this->l2_time);
 	}
 	if (!l1_found and !l2_found) {
+		this->incrementL2Miss();
 		// need to bring data from memory
-		bool ran_lru = l2_cache.load_data(tag2, set2);
+		bool ran_lru = this->l2_cache.load_data(tag2, set2);
 		if (ran_lru) { // could not load data - need to run LRU for l2
-			l1_cache.invalidate_data(tag1, set1); // we keep the caches inclusive - remove the block from l1
+			this->l1_cache.invalidate_data(tag1, set1); // we keep the caches inclusive - remove the block from l1
 		}
-		l1_cache.load_data(tag1, set1);
+		this->l1_cache.load_data(tag1, set1);
+		this->updateAccessTime(this->memory_time);
+	}
+}
+
+void MemoryManager::write(const std::string &addressStr) {
+	this->incrementNumOperations();
+	int set1 = this->l1_cache.extractSet(addressStr);
+	int set2 = this->l2_cache.extractSet(addressStr);
+	int tag1 = this->l1_cache.extractTag(addressStr);
+	int tag2 = this->l2_cache.extractTag(addressStr);
+
+	bool l1_found = this->l1_cache.find(tag1, set1);
+	this->updateAccessTime(this->l1_time);
+	if (this->write_allocate) {
+		if (!l1_found) {
+			bool l2_found = this->l2_cache.find(tag2, set2);
+			this->updateAccessTime(this->l2_time);
+			if (!l2_found) {
+				this->updateAccessTime(this->memory_time);
+				if (this->l2_cache.load_data(tag2, set2)) {
+					this->l1_cache.invalidate_data(tag1, set1);
+				}
+			}
+			this->l1_cache.load_data(tag1, set1);
+			this->updateAccessTime(this->l2_time); //todo not sure
+		}
+	} else {
+		if (!l1_found) {
+			this->incrementL1Miss();
+			bool l2_found = this->l2_cache.find(tag2, set2);
+			this->updateAccessTime(this->l2_time);
+			if (!l2_found) {
+				this->incrementL2Miss();
+			}
+		}
+		this->updateAccessTime(this->memory_time);
 	}
 
 }

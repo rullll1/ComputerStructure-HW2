@@ -60,7 +60,9 @@ int main(int argc, char **argv) {
 			return 0;
 		}
 	}
-
+	MemoryManager memory_manager = MemoryManager(L1Size, L2Size, BSize,
+		BSize, L1Assoc, L2Assoc, L1Cyc, L2Cyc, MemCyc,
+												 WrAlloc);
 
 	while (getline(file, line)) {
 
@@ -73,25 +75,31 @@ int main(int argc, char **argv) {
 			return 0;
 		}
 
-		// DEBUG - remove this line
+		// TODO DEBUG - remove this line
 		cout << "operation: " << operation;
+		if (operation == 'r') {
+			memory_manager.find(address);
+		}
+		if (operation == 'w') {
+			memory_manager.write(address);
+		}
 
 		string cutAddress = address.substr(2); // Removing the "0x" part of the address
 
-		// DEBUG - remove this line
+		//TODO DEBUG - remove this line
 		cout << ", address (hex)" << cutAddress;
 
 		unsigned long int num = 0;
 		num = strtoul(cutAddress.c_str(), NULL, 16);
 
-		// DEBUG - remove this line
+		//TODO DEBUG - remove this line
 		cout << " (dec) " << num << endl;
 
 	}
 
-	double L1MissRate;
-	double L2MissRate;
-	double avgAccTime;
+	double L1MissRate = memory_manager.getL1MissRate();
+	double L2MissRate = memory_manager.getL2MissRate();
+	double avgAccTime = memory_manager.getAverageAccessTime();
 
 	printf("L1miss=%.03f ", L1MissRate);
 	printf("L2miss=%.03f ", L2MissRate);

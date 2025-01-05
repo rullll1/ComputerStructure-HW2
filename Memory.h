@@ -2,22 +2,15 @@
 // Created by rulll on 26/12/2024.
 //
 
-
 #ifndef MEMORY_H
 #define MEMORY_H
 #define WRITE_ALLOCATE 1
 #define NO_WRITE_ALLOCATE 0
-#include <iostream>
 #include <list>
-#include <map>
 #include <vector>
 #include <unordered_map>
 
 using namespace std;
-
-
-
-
 
 class LRU {
 private:
@@ -34,10 +27,10 @@ public:
 
 class Memory {
 private:
-    int cacheSize;          // Total size of the cache (in bytes)
-    int blockSize;          // Size of each cache block (in bytes)
-    int ways;
-    int setSize;
+    unsigned int cacheSize;          // Total size of the cache (in bytes)
+    unsigned int blockSize;          // Size of each cache block (in bytes)
+    unsigned int ways;
+    unsigned int setSize;
     // int tagSize;
 
     // int numLines{};           // Number of cache lines
@@ -52,7 +45,7 @@ private:
 
 
 public:
-    Memory(int cacheSize, int BlockSize, int Ways);
+    Memory(unsigned int cacheSize, unsigned int BlockSize, unsigned int Ways);
     bool find(int tag, int set);
     bool load_data(int tag, int set);
     void invalidate_data(int tag, int set);
@@ -62,21 +55,31 @@ public:
 
 };
 
-class Memory_Manager {
+class MemoryManager {
 private:
     Memory l1_cache;
     Memory l2_cache;
-    int l1_time;
-    int l2_time;
-    int memory_time;
-    int writing_policy;
+    unsigned int l1_time;
+    unsigned int l2_time;
+    unsigned int memory_time;
+    bool write_allocate;
+    unsigned int numL1Miss;
+    unsigned int numL2Miss;
+    unsigned int totalAccessTime;
+    unsigned int numOperations;
+    void incrementL1Miss() { ++numL1Miss; }
+    void incrementL2Miss() { ++numL2Miss; }
+    void incrementNumOperations() { ++numOperations; }
+    void updateAccessTime(const unsigned int newTime) { totalAccessTime += newTime; }
 
 public:
-    Memory_Manager(int l1_cache_size, int l2_cache_size, int l1_block_size, int l2_block_size,
-        int l1_way, int l2_way, int l1_time, int l2_time, int memory_time, int writing_policy);
+    MemoryManager(unsigned int l1_cache_size, unsigned int l2_cache_size, unsigned int l1_block_size, unsigned int l2_block_size,
+        unsigned int l1_way, unsigned int l2_way, unsigned int l1_time, unsigned int l2_time, unsigned int memory_time, bool write_allocate);
     void find(const std::string &addressStr);
-    int extractSet(const std::string &addressStr);
-    int extractTag(const std::string &addressStr);
+    void write(const std::string &addressStr);
+    double getL1MissRate() const { return static_cast<double>(numL1Miss) / static_cast<double>(numOperations); }
+    double getL2MissRate() const { return static_cast<double>(numL2Miss) / static_cast<double>(numOperations); }
+    double getAverageAccessTime() const {return static_cast<double>(totalAccessTime) / static_cast<double>(numOperations); }
 
 };
 #endif //MEMORY_H
