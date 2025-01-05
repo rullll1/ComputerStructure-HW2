@@ -150,9 +150,11 @@ void MemoryManager::find(const std::string &addressStr) {
 		this->incrementL1Miss();
 		l2_found = this->l2_cache.find(tag2, set2);
 		this->updateAccessTime(this->l2_time);
+		if (!l2_found) {
+			this->incrementL2Miss();
+		}
 	}
 	if (!l1_found and !l2_found) {
-		this->incrementL2Miss();
 		// need to bring data from memory
 		bool ran_lru = this->l2_cache.load_data(tag2, set2);
 		if (ran_lru) { // could not load data - need to run LRU for l2
@@ -177,13 +179,18 @@ void MemoryManager::write(const std::string &addressStr) {
 			bool l2_found = this->l2_cache.find(tag2, set2);
 			this->updateAccessTime(this->l2_time);
 			if (!l2_found) {
+                //Block fetched from memory to L2, then to L1 (dirty).
 				this->updateAccessTime(this->memory_time);
 				if (this->l2_cache.load_data(tag2, set2)) {
 					this->l1_cache.invalidate_data(tag1, set1);
 				}
+			} else {
+				// Block fetched from L2, written (dirty).
 			}
 			this->l1_cache.load_data(tag1, set1);
 			this->updateAccessTime(this->l2_time); //todo not sure
+		} else {
+            // Hit in L1: Written (dirty).
 		}
 	} else {
 		if (!l1_found) {
@@ -192,9 +199,11 @@ void MemoryManager::write(const std::string &addressStr) {
 			this->updateAccessTime(this->l2_time);
 			if (!l2_found) {
 				this->incrementL2Miss();
+				this->updateAccessTime(this->memory_time);
 			}
 		}
-		this->updateAccessTime(this->memory_time);
+        // is the write to L1 in different cycle? or same as find
+
 	}
 
 }
