@@ -37,7 +37,9 @@ Memory::Memory(unsigned int cacheSize, unsigned int BlockSize, unsigned int ways
 	this ->setSize = cacheSize - BlockSize - ways;
 	this->ways = pow(2, ways);
 	this->tagDirectory = std::vector<std::vector<int>>(this->ways,
-							   std::vector<int>(pow(2,this->cacheSize), -1)); // init a matrix of -1
+							   std::vector<int>(pow(2,this->setSize), -1)); // init a matrix of -1
+//	this->tagDirectoryDirty = std::vector<std::vector<int>>(this->ways,
+//							   std::vector<int>(pow(2,this->setSize), 0)); // init a matrix of 0
 
 	for (int i=0; i < pow(2,this->setSize); i++) {
 		this->_LRU.emplace_back(this->ways); // Construct each LRU with its capacity
@@ -78,6 +80,7 @@ void Memory::execute_LRU(int tag, int set) {
 	this->_LRU[set].access(way);
 
 }
+
 bool Memory::find(int tag, int set) {
 	for (int way=0; way < this->tagDirectory.size(); way++) {
 		if (tagDirectory[way][set] == tag) { // we have a hit
@@ -89,13 +92,47 @@ bool Memory::find(int tag, int set) {
 	return false;
 }
 
+//void Memory::markDirty(int tag, int set) {
+//	for (int way=0; way < this->tagDirectory.size(); way++) {
+//		if (tagDirectory[way][set] == tag) { // we have a hit
+//			tagDirectoryDirty[way][set] = DIRTY;
+//		}
+//	}
+//}
+
+//void Memory::markClean(int tag, int set) {
+//	for (int way=0; way < this->tagDirectory.size(); way++) {
+//		if (tagDirectory[way][set] == tag) { // we have a hit
+//			tagDirectoryDirty[way][set] = 0;
+//		}
+//	}
+//}
+
+//bool Memory::isDirty(int tag, int set) {
+//	for (int way=0; way < this->tagDirectory.size(); way++) {
+//        if (tagDirectory[way][set] == tag && tagDirectoryDirty[way][set] == DIRTY) {
+//			return true;
+//        }
+//	}
+//    return false;
+//}
+
+//int Memory::getWay(int tag, int set) {
+//	for (int way=0; way < this->tagDirectory.size(); way++) {
+//        if (tagDirectory[way][set] == tag) {
+//			return way;
+//        }
+//	}
+//    return -1;
+//}
+
 bool Memory::load_data(int tag, int set) {
 	bool loaded_data = false;
 	bool ran_LRU = false;
 	// bring data to one of the ways
 	for (int way=0; way < this->tagDirectory.size(); way++) {
-		if (tagDirectory[way][set] == -1) { // we found an empty set
-			tagDirectory[way][set] = tag;
+		if (this->tagDirectory[way][set] == -1) { // we found an empty set
+			this->tagDirectory[way][set] = tag;
 			this->_LRU[set].access(way);
 			loaded_data = true;
 			break;
@@ -158,9 +195,21 @@ void MemoryManager::find(const std::string &addressStr) {
 		// need to bring data from memory
 		bool ran_lru = this->l2_cache.load_data(tag2, set2);
 		if (ran_lru) { // could not load data - need to run LRU for l2
-			this->l1_cache.invalidate_data(tag1, set1); // we keep the caches inclusive - remove the block from l1
+//            int way2 = this->l2_cache.getWay(tag2, set2); // TODO: need the tag of the evacuated data.
+//            if (this->l2_cache.isDirty(way2, set2)) {
+//                this->updateAccessTime(this->memory_time); // update memory when l2 is dirty and evacuated
+//            	this->l2_cache.markClean(way2, set2);
+//            }
+//            this->l2_cache.execute_LRU(tag2, set2);
+            this->l1_cache.invalidate_data(tag1, set1); // we keep the caches inclusive - remove the block from l1
 		}
-		this->l1_cache.load_data(tag1, set1);
+		ran_lru = this->l1_cache.load_data(tag1, set1);
+        if (ran_lru) { // could not load data - need to run LRU for l1
+//            if (this->l1_cache.isDirty(tag1, set1)) {
+//                this->updateAccessTime(this->l2_time); // update l2 when l1 is dirty and evacuated
+//            	this->l1_cache.markClean(tag2, set2);
+//            }
+		}
 		this->updateAccessTime(this->memory_time);
 	}
 }
@@ -173,39 +222,37 @@ void MemoryManager::write(const std::string &addressStr) {
 	int tag2 = this->l2_cache.extractTag(addressStr);
 
 	bool l1_found = this->l1_cache.find(tag1, set1);
-	this->updateAccessTime(this->l1_time);
-	if (this->write_allocate) {
-		if (!l1_found) {
-			bool l2_found = this->l2_cache.find(tag2, set2);
-			this->updateAccessTime(this->l2_time);
-			if (!l2_found) {
-                //Block fetched from memory to L2, then to L1 (dirty).
-				this->updateAccessTime(this->memory_time);
-				if (this->l2_cache.load_data(tag2, set2)) {
-					this->l1_cache.invalidate_data(tag1, set1);
-				}
-			} else {
-				// Block fetched from L2, written (dirty).
-			}
-			this->l1_cache.load_data(tag1, set1);
-			this->updateAccessTime(this->l2_time); //todo not sure
-		} else {
-            // Hit in L1: Written (dirty).
-		}
-	} else {
-		if (!l1_found) {
-			this->incrementL1Miss();
-			bool l2_found = this->l2_cache.find(tag2, set2);
-			this->updateAccessTime(this->l2_time);
-			if (!l2_found) {
-				this->incrementL2Miss();
-				this->updateAccessTime(this->memory_time);
-			}
-		}
-        // is the write to L1 in different cycle? or same as find
+    this->updateAccessTime(this->l1_time);
+    bool l2_found = false;
 
+    // START WRITE-BACK IF HIT
+    if (l1_found) {
+//    	this->l1_cache.markDirty(tag1, set1);
+    } else {
+        this->incrementL1Miss();
+    	l2_found = this->l2_cache.find(tag2, set2);
+		this->updateAccessTime(this->l2_time);
+        if (l2_found) {
+//        	this->l2_cache.markDirty(tag1, set1);
+        }
+    }
+    // END WRITE-BACK IF HIT
+
+    if (!l1_found && !l2_found) {
+        this->incrementL2Miss();
+        this->updateAccessTime(this->memory_time);
+    	if (this->write_allocate) {
+        	//Block fetched from memory to L2, then to L1 (dirty).
+			bool ran_lru = this->l2_cache.load_data(tag2, set2);
+			if (ran_lru) {
+				this->l1_cache.invalidate_data(tag1, set1);
+//            	if (this->l2_cache.isDirty(tag2, set2)) {
+//                	this->updateAccessTime(this->memory_time); // update memory when l2 is dirty and evacuated
+//            		this->l2_cache.markClean(tag2, set2);
+//            	}
+            }
+    	}
 	}
-
 }
 
 

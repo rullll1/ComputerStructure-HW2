@@ -6,6 +6,7 @@
 #define MEMORY_H
 #define WRITE_ALLOCATE 1
 #define NO_WRITE_ALLOCATE 0
+//#define DIRTY 1
 #include <list>
 #include <vector>
 #include <unordered_map>
@@ -31,15 +32,8 @@ private:
     unsigned int blockSize;          // Size of each cache block (in bytes)
     unsigned int ways;
     unsigned int setSize;
-    // int tagSize;
-
-    // int numLines{};           // Number of cache lines
-    // int numBlocks{};          // Number of blocks in the cache
-    // int cacheHits{};          // Number of cache hits
-    // int cacheMisses{};        // Number of cache misses
-    // int* cache;      // Simulated cache (simple vector for storing blocks)
-    // int** tagDirectory;   // Pointer to hold the dynamically allocated array tagDirectory;
     std::vector<std::vector<int>> tagDirectory;
+    // std::vector<std::vector<int>> tagDirectoryDirty;
     std::vector<LRU> _LRU;
 
 
@@ -47,10 +41,14 @@ private:
 public:
     Memory(unsigned int cacheSize, unsigned int BlockSize, unsigned int Ways);
     bool find(int tag, int set);
+    // void markDirty(int tag, int set);
+    // void markClean(int tag, int set);
+    // bool isDirty(int tag, int set);
     bool load_data(int tag, int set);
     void invalidate_data(int tag, int set);
     int extractSet(const std::string &addressStr);
     int extractTag(const std::string &addressStr);
+    // int getWay(int tag, int set);
     void execute_LRU(int tag, int set);
 
 };
