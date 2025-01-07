@@ -206,6 +206,7 @@ MemoryManager::MemoryManager(unsigned int l1_cache_size,
 	this->numL2Miss = 0;
 	this->numOperations = 0;
 	this->totalAccessTime = 0;
+	this->accessL2 = 0;
 }
 
 void MemoryManager::find(const std::string &addressStr) {
@@ -221,6 +222,7 @@ void MemoryManager::find(const std::string &addressStr) {
 	if (!l1_found) {
 		this->incrementL1Miss();
 		l2_found = this->l2_cache.find(tag2, set2);
+		this->accessL2 ++;
 		this->updateAccessTime(this->l2_time);
 		if (!l2_found) {
 			this->incrementL2Miss();
@@ -229,6 +231,7 @@ void MemoryManager::find(const std::string &addressStr) {
 	std::cout << "L1:" << l1_found << " L2:" << l2_found << endl;
 	if (!l1_found and !l2_found) {
 		// need to bring data from memory
+
 		std::string address_to_remove = this->l2_cache.load_data(tag2, set2);
 		if (!address_to_remove.empty()) { // could not load data - need to run LRU for l2
 			this->l1_cache.invalidate_data(address_to_remove); // we keep the caches inclusive - remove the block from l1
@@ -250,9 +253,12 @@ void MemoryManager::write(const std::string &addressStr) {
 	this->updateAccessTime(this->l1_time);
 	if (this->write_allocate) {
 		if (!l1_found) {
+			this->accessL2 ++;
+			this->incrementL1Miss();
 			l2_found = this->l2_cache.find(tag2, set2);
 			this->updateAccessTime(this->l2_time);
 			if (!l2_found) {
+				this->incrementL2Miss();
                 //Block fetched from memory to L2, then to L1 (dirty).
 				this->updateAccessTime(this->memory_time);
 				std::string address_to_remove =  this->l2_cache.load_data(tag2, set2);
@@ -263,13 +269,13 @@ void MemoryManager::write(const std::string &addressStr) {
 				// Block fetched from L2, written (dirty).
 			}
 			this->l1_cache.load_data(tag1, set1);
-			this->updateAccessTime(this->l2_time); //todo not sure
 		} else {
             // Hit in L1: Written (dirty).
 		}
 	} else {
 		if (!l1_found) {
 			this->incrementL1Miss();
+			this->accessL2 ++;
 			l2_found = this->l2_cache.find(tag2, set2);
 			this->updateAccessTime(this->l2_time);
 			if (!l2_found) {

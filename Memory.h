@@ -91,6 +91,8 @@ private:
     unsigned int numL2Miss;
     unsigned int totalAccessTime;
     unsigned int numOperations;
+    unsigned int accessL2;
+
     void incrementL1Miss() { ++numL1Miss; }
     void incrementL2Miss() { ++numL2Miss; }
     void incrementNumOperations() { ++numOperations; }
@@ -102,7 +104,7 @@ public:
     void find(const std::string &addressStr);
     void write(const std::string &addressStr);
     double getL1MissRate() const { return static_cast<double>(numL1Miss) / static_cast<double>(numOperations); }
-    double getL2MissRate() const { return static_cast<double>(numL2Miss) / static_cast<double>(numOperations); }
+    double getL2MissRate() const { return static_cast<double>(numL2Miss) / static_cast<double>(accessL2); }
     double getAverageAccessTime() const {return static_cast<double>(totalAccessTime) / static_cast<double>(numOperations); }
 
 };
