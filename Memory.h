@@ -14,38 +14,18 @@
 
 using namespace std;
 
-// class LRU {
-// private:
-//     int capacity{};
-//     list<int> usageOrder;  // Doubly linked list to maintain order of usage
-//     std::unordered_map<int, std::list<int>::iterator> values;
-// public:
-//     explicit LRU(int n);
-//     void access(int num);
-//     int remove_least_recently_used();
-//     void remove_specific(int target);
 
-// };
 class LRU {
 private:
-    int capacity; // Maximum capacity of the cache
-    std::list<int> lruList; // Doubly linked list to store keys in LRU order
-    std::unordered_map<int, std::list<int>::iterator> cacheMap; // Maps keys to their position in lruList
+    int capacity;
+    std::list<int> lruList;
+    std::unordered_map<int, std::list<int>::iterator> cacheMap;
 
 public:
-    // Constructor to initialize the LRU Cache with a given capacity
     explicit LRU(int n);
-
-    // Function to access a specific value (mark it as most recently used)
     void access(int num);
-
-    // Function to remove the least recently used element
     int remove_least_recently_used();
-
-    // Function to remove a specific value from the cache
     void remove_specific(int target);
-
-    // Helper function to print the contents of the cache (for debugging)
     void printCache() const;
 };
 
@@ -55,14 +35,6 @@ private:
     unsigned int blockSize;          // Size of each cache block (in bytes)
     unsigned int ways;
     unsigned int setSize;
-    // int tagSize;
-
-    // int numLines{};           // Number of cache lines
-    // int numBlocks{};          // Number of blocks in the cache
-    // int cacheHits{};          // Number of cache hits
-    // int cacheMisses{};        // Number of cache misses
-    // int* cache;      // Simulated cache (simple vector for storing blocks)
-    // int** tagDirectory;   // Pointer to hold the dynamically allocated array tagDirectory;
     std::vector<std::vector<int>> tagDirectory;
     std::vector<std::vector<int>> tagDirectoryDirty;
 public:
@@ -77,7 +49,6 @@ public:
     void markClean(int tag, int set);
     bool isDirty(int tag, int set);
     std::string load_data(int tag, int set);
-    void invalidate_data(std::string& address);
     int extractSet(const std::string &addressStr);
     int extractTag(const std::string &addressStr);
     std::string execute_LRU(int tag, int set);

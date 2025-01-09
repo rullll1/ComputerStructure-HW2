@@ -9,65 +9,37 @@
 #include <cstdint>
 #include <iomanip>
 #include <iostream>
-//
-// LRU::LRU(int n) {
-// 	this->capacity = n;
-// }
-// void LRU::access(int value) {
-// 	// If the number is already in the values, move it to the tail (most recent)
-// 	if (values.find(value) != values.end()) {
-// 		usageOrder.erase(values[value]);  // Remove the old position
-// 	}
-//
-// 	// Add the number to the end of the list (most recently used)
-// 	usageOrder.push_back(value);
-// 	values[value] = --usageOrder.end();  // Update the values with the new position
-// }
-// int LRU::remove_least_recently_used() {
-// 	int lru = usageOrder.front();  // Least recently used element
-// 	usageOrder.pop_front();  // Remove it from the list
-// 	values.erase(lru);  // Also remove it from the values
-// 	return lru;
-// }
-// void LRU::remove_specific(int target) {
-// 	usageOrder.erase(values[target]);  // Remove the old position
-// }
+
+
 
 LRU::LRU(int n) : capacity(n) {}
 
-// Function to access a specific value (mark it as most recently used)
 void LRU::access(int num) {
 	auto it = cacheMap.find(num);
 	if (it != cacheMap.end()) {
-		// If the number exists in the cache, move it to the front (most recently used)
 		lruList.erase(it->second);
-	} else { // TODO: remove else
-		// If the cache is full, remove the least recently used element
+	} else {
 		if (lruList.size() >= capacity) {
 			remove_least_recently_used();
 		}
 	}
-	// Insert the value at the front of the list
 	lruList.push_front(num);
 	cacheMap[num] = lruList.begin();
 }
 
-// Function to remove the least recently used element
 int LRU::remove_least_recently_used() {
 	if (!lruList.empty()) {
-		int lruValue = lruList.back(); // Get the least recently used value (back of the list)
-		lruList.pop_back(); // Remove it from the list
-		cacheMap.erase(lruValue); // Remove it from the map
-		return lruValue; // Return the removed value
+		int lruValue = lruList.back();
+		lruList.pop_back();
+		cacheMap.erase(lruValue);
+		return lruValue;
 	}
-	return -1; // Return -1 if the cache is empty
+	return -1;
 }
 
-// Function to remove a specific value from the cache
 void LRU::remove_specific(int target) {
 	auto it = cacheMap.find(target);
 	if (it != cacheMap.end()) {
-		// If the target exists, remove it from the list and map
 		lruList.erase(it->second);
 		cacheMap.erase(it);
 	}
@@ -82,32 +54,29 @@ void LRU::printCache() const {
 	std::cout << std::endl;
 }
 Memory::Memory(unsigned int cacheSize, unsigned int BlockSize, unsigned int ways){
-	this->cacheSize = cacheSize; //pow(2,cacheSize);
-	this->blockSize = BlockSize; //pow(2, BlockSize);
+	this->cacheSize = cacheSize;
+	this->blockSize = BlockSize;
 	this ->setSize = cacheSize - BlockSize - ways;
 	this->ways = pow(2, ways);
 	this->tagDirectory = std::vector<std::vector<int>>(this->ways,
-							   std::vector<int>(pow(2,this->setSize), -1)); // init a matrix of -1
+							   std::vector<int>(pow(2,this->setSize), -1));
 	this->tagDirectoryDirty = std::vector<std::vector<int>>(this->ways,
-							   std::vector<int>(pow(2,this->setSize), 0)); // init a matrix of 0
+							   std::vector<int>(pow(2,this->setSize), 0));
 
 	for (int i=0; i < pow(2,this->setSize); i++) {
-		this->_LRU.emplace_back(this->ways); // Construct each LRU with its capacity
+		this->_LRU.emplace_back(this->ways);
 	}
-	// this->cache = new int[pow(2, this->setSize)];  // Dynamically allocate the array
 
 
 }
 
 int Memory::extractSet(const std::string &addressStr) {
-	// Convert the string to an integer (assuming a hexadecimal format)
 	int set;
 	uint32_t address;
 	std::stringstream ss;
 	ss << std::hex << addressStr;
 	ss >> address;
 
-	// Extract the set index (middle 11 bits)
 	uint32_t setMask = (1 << this->setSize) - 1;  // Mask to extract index bits
 	set = (address >> this->blockSize) & setMask;
 	return set;
@@ -116,14 +85,11 @@ int Memory::extractSet(const std::string &addressStr) {
 std::string Memory::constructAddress(int tag, int set) {
 	uint32_t address = 0;
 
-	// Reconstruct the tag part
 	address |= (tag << (this->setSize + this->blockSize));
 
-	// Reconstruct the set part
 	uint32_t setMask = (1 << this->setSize) - 1; // Mask to ensure set fits in `setSize` bits
 	address |= ((set & setMask) << this->blockSize);
 
-	// Convert the reconstructed address to a hexadecimal string with "0x" prefix
 	std::stringstream ss;
 	ss << "0x" << std::hex << std::setw(8) << std::setfill('0') << address;
 	return ss.str();
@@ -189,45 +155,31 @@ std::string Memory::load_data(int tag, int set) {
 	bool loaded_data = false;
 	bool ran_LRU = false;
 	std::string address_to_remove;
-	// bring data to one of the ways
 	for (int way=0; way < this->tagDirectory.size(); way++) {
         if (tagDirectory[way][set] == tag) {
           loaded_data = true;
           break;
         }
 		if (tagDirectory[way][set] == -1) { // we found an empty set
-			tagDirectory[way][set] = tag; // TODO: remove
+			tagDirectory[way][set] = tag;
 			this->_LRU[set].access(way);
 			loaded_data = true;
 			break;
 		}
 	}
-	if (!loaded_data) { // all ways on the specific set are full - need to run LRU
+	if (!loaded_data) {
 		address_to_remove = this->execute_LRU(tag, set);
 		ran_LRU = true;
 	}
-	return address_to_remove; // notify that LRU was removed
-}
-
-void Memory::invalidate_data(std::string& address) {
-	int set = this->extractSet(address);
-	int tag = this->extractTag(address);
-	// we will run this if we used lru in l2 and want to invalidate data in l1
-	for (int way=0; way < this->tagDirectory.size(); way++) {
-		if (tagDirectory[way][set] == tag) { // we found an empty set
-			tagDirectory[way][set] = -1; // now its invalid
-			this->_LRU[set].remove_specific(way);
-			break;
-		}
-	}
+	return address_to_remove;
 }
 
 MemoryManager::MemoryManager(unsigned int l1_cache_size,
 	unsigned int l2_cache_size, unsigned int l1_block_size, unsigned int l2_block_size,
 		unsigned int l1_way, unsigned int l2_way, unsigned int l1_time, unsigned int l2_time,
 		unsigned int memory_time, bool write_allocate)
-	: l1_cache(l1_cache_size, l1_block_size, l1_way),  // Initialize l1_cache in the initializer list
-	  l2_cache(l2_cache_size, l2_block_size, l2_way)   // Initialize l2_cache in the initializer list
+	: l1_cache(l1_cache_size, l1_block_size, l1_way),
+	  l2_cache(l2_cache_size, l2_block_size, l2_way)
 {
 	this->l1_time = l1_time;
 	this->l2_time = l2_time;
@@ -270,7 +222,6 @@ void MemoryManager::find(const std::string &addressStr) {
     			this->l2_cache.markDirty(tag22, set22);
     			this->l1_cache.markClean(tag1, set1);
     		}
-    		//    			this->l1_cache.invalidate_data(address_to_ingest);
     	}
 //    	this->l1_cache.markDirty(tag1, set1);
     }
@@ -285,7 +236,6 @@ void MemoryManager::find(const std::string &addressStr) {
 				this->l2_cache.load_data(tag22, set22);
 				this->l1_cache.markClean(tag1, set1);
 			}
-//			this->l1_cache.invalidate_data(address_to_remove); // we keep the caches inclusive - remove the block from l1
 		}
 		std::string address_to_ingest = this->l1_cache.load_data(tag1, set1);
         if (!address_to_ingest.empty()) {
@@ -296,9 +246,7 @@ void MemoryManager::find(const std::string &addressStr) {
 				this->l2_cache.load_data(tag22, set22);
 				this->l1_cache.markClean(tag1, set1);
 			}
-//        	this->l1_cache.invalidate_data(address_to_ingest);
         }
-		// 0x00000 -> L2
 		this->updateAccessTime(this->memory_time);
 	}
 }
@@ -336,7 +284,6 @@ void MemoryManager::write(const std::string &addressStr) {
                     this->l2_cache.markDirty(tag22, set22);
     				this->l1_cache.markClean(tag1, set1);
     			}
-//    			this->l1_cache.invalidate_data(address_to_ingest);
     		}
     		this->l1_cache.markDirty(tag1, set1);
     	}
@@ -356,7 +303,6 @@ void MemoryManager::write(const std::string &addressStr) {
     			this->l2_cache.markDirty(tag22, set22);
     			this->l1_cache.markClean(tag1, set1);
     		}
-//    		this->l1_cache.invalidate_data(address_to_remove); // we keep the caches inclusive - remove the block from l1
     	}
     	std::string address_to_ingest =  this->l1_cache.load_data(tag1, set1);
     	if (!address_to_ingest.empty()) {
@@ -364,7 +310,6 @@ void MemoryManager::write(const std::string &addressStr) {
     		if (is_l1_dirty) {
     			this->l1_cache.markClean(tag1, set1);
     		}
-//    		this->l1_cache.invalidate_data(address_to_ingest);
     	}
         this->l1_cache.markDirty(tag1, set1);
     }
