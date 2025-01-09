@@ -191,7 +191,7 @@ std::string Memory::load_data(int tag, int set) {
 	std::string address_to_remove;
 	// bring data to one of the ways
 	for (int way=0; way < this->tagDirectory.size(); way++) {
-		if (tagDirectory[way][set] == -1) { // we found an empty set
+		if (tagDirectory[way][set] == -1 || tagDirectory[way][set] == tag) { // we found an empty set
 			tagDirectory[way][set] = tag; // TODO: remove
 			this->_LRU[set].access(way);
 			loaded_data = true;
@@ -259,27 +259,26 @@ void MemoryManager::find(const std::string &addressStr) {
 		// need to bring data from memory
 		std::string address_to_remove = this->l2_cache.load_data(tag2, set2);
 		if (!address_to_remove.empty()) { // could not load data - need to run LRU for l2
-			int set11 = this->l1_cache.extractSet(address_to_remove);
-			int tag11 = this->l1_cache.extractTag(address_to_remove);
-			bool is_l1_dirty = this->l1_cache.isDirty(tag11, set11);
+			bool is_l1_dirty = this->l1_cache.isDirty(tag1, set1);
 			if (is_l1_dirty) {
 				int set22 = this->l2_cache.extractSet(address_to_remove);
 				int tag22 = this->l2_cache.extractTag(address_to_remove);
-				this->l2_cache.load_data(tag2, set2);
-				this->l1_cache.markClean(tag11, set11);
+				this->l2_cache.load_data(tag22, set22);
+				this->l1_cache.markClean(tag1, set1);
 			}
 			this->l1_cache.invalidate_data(address_to_remove); // we keep the caches inclusive - remove the block from l1
 		}
 		std::string address_to_ingest = this->l1_cache.load_data(tag1, set1);
-		int set11 = this->l1_cache.extractSet(address_to_ingest);
-		int tag11 = this->l1_cache.extractTag(address_to_ingest);
-		bool is_l1_dirty = this->l1_cache.isDirty(tag1, set1);
-		if (is_l1_dirty) {
-			int set22 = this->l2_cache.extractSet(address_to_ingest);
-			int tag22 = this->l2_cache.extractTag(address_to_ingest);
-			this->l2_cache.load_data(tag22, set22);
-			this->l1_cache.markClean(tag1, set1);
-		}
+        if (!address_to_ingest.empty()) {
+			bool is_l1_dirty = this->l1_cache.isDirty(tag1, set1);
+			if (is_l1_dirty) {
+				int set22 = this->l2_cache.extractSet(address_to_ingest);
+				int tag22 = this->l2_cache.extractTag(address_to_ingest);
+				this->l2_cache.load_data(tag22, set22);
+				this->l1_cache.markClean(tag1, set1);
+			}
+        	this->l1_cache.invalidate_data(address_to_ingest);
+        }
 		// 0x00000 -> L2
 		this->updateAccessTime(this->memory_time);
 	}
@@ -307,30 +306,43 @@ void MemoryManager::write(const std::string &addressStr) {
     if (l2_found) {
     	// Hit in L2: Written (dirty).
     	this->l2_cache.markDirty(tag2, set2);
-    	std::string address_to_remove = this->l1_cache.load_data(tag1, set1);
+    	if (this->write_allocate) {
+    		std::string address_to_ingest = this->l1_cache.load_data(tag1, set1);
+    		if (!address_to_ingest.empty()) {
+    			bool is_l1_dirty = this->l1_cache.isDirty(tag1, set1);
+//    			if (is_l1_dirty) {
+//    				int set22 = this->l2_cache.extractSet(address_to_ingest);
+//    				int tag22 = this->l2_cache.extractTag(address_to_ingest);
+//    				this->l2_cache.load_data(tag22, set22);
+//    				this->l1_cache.markClean(tag1, set1);
+//    			}
+    			this->l1_cache.invalidate_data(address_to_ingest);
+    		}
+    	}
     	return;
     }
 
 	this->incrementL2Miss();
     if (this->write_allocate) {
-    	bool is_l1_dirty = this->l1_cache.isDirty(tag1, set1);
-    	bool is_l2_dirty = this->l2_cache.isDirty(tag2, set2);
-
     	std::string address_to_remove =  this->l2_cache.load_data(tag2, set2);
     	if (!address_to_remove.empty()) {
-    		this->l1_cache.invalidate_data(address_to_remove);
-    		if (is_l2_dirty) {
-    			this->updateAccessTime(this->memory_time);
-    			this->l2_cache.markClean(tag2, set2);
-    		}
+    		this->l2_cache.markClean(tag2, set2);
+    		bool is_l1_dirty = this->l1_cache.isDirty(tag1, set1);
+//    		if (is_l1_dirty) {
+//    			int set22 = this->l2_cache.extractSet(address_to_remove);
+//    			int tag22 = this->l2_cache.extractTag(address_to_remove);
+//    			this->l2_cache.load_data(tag22, set22);
+//    			this->l1_cache.markClean(tag1, set1);
+//    		}
+    		this->l1_cache.invalidate_data(address_to_remove); // we keep the caches inclusive - remove the block from l1
     	}
     	std::string address_to_ingest =  this->l1_cache.load_data(tag1, set1);
     	if (!address_to_ingest.empty()) {
+    		bool is_l1_dirty = this->l1_cache.isDirty(tag1, set1);
     		if (is_l1_dirty) {
-    			this->updateAccessTime(this->l2_time);
     			this->l1_cache.markClean(tag1, set1);
     		}
-    		this->l1_cache.invalidate_data(address_to_remove);
+    		this->l1_cache.invalidate_data(address_to_ingest);
     	}
         this->l1_cache.markDirty(tag1, set1);
     }
