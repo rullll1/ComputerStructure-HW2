@@ -6,6 +6,7 @@
 #define MEMORY_H
 #define WRITE_ALLOCATE 1
 #define NO_WRITE_ALLOCATE 0
+#define DIRTY 1
 #include <list>
 #include <vector>
 #include <string>
@@ -63,6 +64,8 @@ private:
     // int* cache;      // Simulated cache (simple vector for storing blocks)
     // int** tagDirectory;   // Pointer to hold the dynamically allocated array tagDirectory;
     std::vector<std::vector<int>> tagDirectory;
+    std::vector<std::vector<int>> tagDirectoryDirty;
+public:
     std::vector<LRU> _LRU;
 
 
@@ -70,6 +73,9 @@ private:
 public:
     Memory(unsigned int cacheSize, unsigned int BlockSize, unsigned int Ways);
     bool find(int tag, int set);
+    void markDirty(int tag, int set);
+    void markClean(int tag, int set);
+    bool isDirty(int tag, int set);
     std::string load_data(int tag, int set);
     void invalidate_data(std::string& address);
     int extractSet(const std::string &addressStr);

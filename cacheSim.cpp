@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
 		}
 
 		// TODO DEBUG - remove this line
-		cout << "operation: " << operation;
+		// cout << "operation: " << operation;
 		if (operation == 'r') {
 			memory_manager.find(address);
 		}
@@ -87,13 +87,13 @@ int main(int argc, char **argv) {
 		string cutAddress = address.substr(2); // Removing the "0x" part of the address
 
 		//TODO DEBUG - remove this line
-		cout << ", address (hex)" << cutAddress;
+		// cout << ", address (hex)" << cutAddress;
 
 		unsigned long int num = 0;
 		num = strtoul(cutAddress.c_str(), NULL, 16);
 
 		//TODO DEBUG - remove this line
-		cout << " (dec) " << num << endl;
+		// cout << " (dec) " << num << endl;
 
 	}
 
