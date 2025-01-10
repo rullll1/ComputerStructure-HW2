@@ -53,6 +53,7 @@ public:
     int extractTag(const std::string &addressStr);
     std::string execute_LRU(int tag, int set);
     std::string constructAddress(int tag, int set);
+    void invalidate_data(std::string& address);
 
 };
 
